@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+
+# logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+
+# build
+dist/
+build/
+.next/
+out/
+
+# cache
+.cache/
+.parcel-cache/
+turbo/
+.vite/
+
+# editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# misc
+coverage/
+*.tsbuildinfo

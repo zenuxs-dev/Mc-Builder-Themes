@@ -1,0 +1,146 @@
+/* ─── Reset ───────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Space Grotesk', sans-serif; background: #050508; color: #e0e0e0; overflow-x: hidden; }
+a { text-decoration: none; color: inherit; }
+button { cursor: pointer; font-family: inherit; }
+input, textarea { font-family: inherit; }
+img { max-width: 100%; }
+ul, ol { list-style: none; }
+
+/* ─── Cyber Overlays ───────────────────────────── */
+body::before {
+  content: " ";
+  position: fixed;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 9999;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+  opacity: 0.1;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(circle, transparent 20%, #050508 150%);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ─── Animations ─────────────────────────────── */
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes scan {
+  0% { top: -100%; }
+  100% { top: 100%; }
+}
+
+@keyframes glitch-skew {
+  0% { transform: skew(0deg); }
+  20% { transform: skew(2deg); }
+  40% { transform: skew(-2deg); }
+  60% { transform: skew(1deg); }
+  80% { transform: skew(-1deg); }
+  100% { transform: skew(0deg); }
+}
+
+/* ─── Custom Scrollbar ────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #050508; }
+::-webkit-scrollbar-thumb { background: #00ff8840; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
+
+/* ─── Shared Cyber Classes ────────────────────── */
+.cyber-grid {
+  background-image: 
+    linear-gradient(rgba(0, 255, 136, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 136, 0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.cyber-border {
+  position: relative;
+  border: 1px solid rgba(0, 255, 136, 0.2);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%);
+}
+
+.cyber-border::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 2px;
+  background: linear-gradient(90deg, transparent, #00ff88, transparent);
+  animation: scan 3s linear infinite;
+}
+
+.glitch-text:hover {
+  animation: glitch 0.3s cubic-bezier(.25,.46,.45,.94) both infinite;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  background: rgba(0, 255, 136, 0.05);
+  border-color: rgba(0, 255, 136, 0.3);
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 10px 40px rgba(0, 255, 136, 0.1);
+}
+
+/* ─── Layout ──────────────────────────────────── */
+.main-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar-nav {
+  width: 80px;
+  height: 100vh;
+  background: rgba(5, 5, 8, 0.8);
+  border-right: 1px solid rgba(0, 255, 136, 0.1);
+  position: fixed;
+  left: 0; top: 0;
+  z-index: 1000;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+
+.sidebar-nav:hover {
+  width: 240px;
+  border-right-color: rgba(0, 255, 136, 0.3);
+}
+
+.content-wrapper {
+  margin-left: 80px;
+  flex: 1;
+  width: calc(100% - 80px);
+}
+
+@media (max-width: 768px) {
+  .main-layout { flex-direction: column; }
+  .sidebar-nav {
+    width: 100%; height: 60px;
+    position: fixed; bottom: 0; top: auto; left: 0;
+    border-right: none; border-top: 1px solid rgba(0, 255, 136, 0.1);
+    display: flex; align-items: center; justify-content: space-around;
+  }
+  .sidebar-nav:hover { width: 100%; }
+  .content-wrapper { margin-left: 0; width: 100%; padding-bottom: 60px; }
+}
