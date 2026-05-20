@@ -29,7 +29,7 @@ export default async function AnnouncementsPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '12px' }}>
                     <h2 style={{ fontSize: '18px', fontWeight: 800 }}>{a.title}</h2>
                     <span style={{ fontSize: '11px', opacity: 0.4, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {new Date(a.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(a.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                   </div>
                   <p style={{ fontSize: '14px', opacity: 0.65, lineHeight: 1.7 }}>{a.content}</p>

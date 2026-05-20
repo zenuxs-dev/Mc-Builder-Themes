@@ -1,3 +1,5 @@
+import { cache } from 'react';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 const API_BASE = API_URL.replace(/\/api\/?$/, '');
 const SITE_KEY = (process.env.NEXT_PUBLIC_SITE_KEY || '').trim();
@@ -20,7 +22,7 @@ function normalizeUploads(obj: any): any {
   return out;
 }
 
-export async function getSite() {
+export const getSite = cache(async function getSite() {
   const trimmedKey = SITE_KEY.trim();
   if (!trimmedKey) {
     console.warn('getSite: SITE_KEY is missing');
@@ -29,7 +31,7 @@ export async function getSite() {
   try {
     const url = `${API_URL}/sites/key/${trimmedKey}`;
     console.log('getSite: Fetching from', url);
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { next: { revalidate: 10 } });
     if (!res.ok) {
       console.error(`getSite: Fetch failed with status ${res.status} for key ${trimmedKey}`);
       return null;
@@ -40,7 +42,7 @@ export async function getSite() {
     console.error('getSite: Error fetching site:', err);
     return null;
   }
-}
+});
 
 export async function getPage(siteId: string, slug: string) {
   try {
@@ -107,7 +109,7 @@ export async function submitForm(formId: string, data: any) {
 }
 
 export async function createPaymentOrder(siteId: string, productId: string,
-  buyerInfo: { payerName: string; payerEmail: string; payerContact?: string; note?: string }) {
+  buyerInfo: { payerName: string; payerEmail: string; payerContact?: string; note?: string; buyerUsername?: string }) {
   try {
     const res = await fetch(`${API_URL}/payments/zenuxs/create-order`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

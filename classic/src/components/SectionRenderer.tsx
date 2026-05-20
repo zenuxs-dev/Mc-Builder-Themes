@@ -45,6 +45,7 @@ const btnRadius: Record<string, string> = {
 };
 
 export default function SectionRenderer({ section, theme, extras }: Props) {
+  const [copied, setCopied] = useState(false);
   const { primaryColor, backgroundColor, textColor, buttonStyle, font, fontSizeBase, containerWidth } = theme;
   const radius = btnRadius[buttonStyle] || '12px';
 
@@ -107,12 +108,25 @@ export default function SectionRenderer({ section, theme, extras }: Props) {
               const buttons = section.content?.buttons && section.content.buttons.length > 0
                 ? section.content.buttons
                 : section.content?.buttonText ? [{ text: section.content.buttonText, url: section.content.buttonUrl }] : [];
-              if (buttons.length === 0) return null;
+
+              const javaIp = extras?.site?.serverIp ? (extras.site.serverIp + (extras.site.requirePortInJava && extras.site.serverPort ? `:${extras.site.serverPort}` : '')) : '';
+
+              const copyIp = () => {
+                navigator.clipboard.writeText(javaIp || 'mc.server.com');
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              };
+
               return (
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '18px', flexWrap: 'wrap' }}>
                   {buttons.map((b: any, i: number) => (
                     <Btn key={i} href={b.url || '#'}>{b.text}</Btn>
                   ))}
+                  
+                  <button onClick={copyIp} style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: textColor, borderRadius: radius, padding: '12px 28px', fontWeight: 700, fontSize: '14px', border: `1px solid ${primaryColor}40`, cursor: 'pointer', transition: '0.2s', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: extras?.mcData?.online ? '#22c55e' : '#ef4444', boxShadow: `0 0 10px ${extras?.mcData?.online ? '#22c55e' : '#ef4444'}` }} />
+                     {copied ? 'Copied!' : (javaIp || 'mc.server.com')}
+                  </button>
                 </div>
               );
             })()}
@@ -144,11 +158,30 @@ export default function SectionRenderer({ section, theme, extras }: Props) {
                 </div>
               ))}
             </div>
-            {section.content.serverIp && (
-              <p style={{ textAlign: 'center', marginTop: '24px', fontFamily: 'monospace', fontSize: '16px', color: primaryColor, opacity: 0.8 }}>
-                {section.content.serverIp}
-              </p>
-            )}
+            <div style={{ marginTop: '48px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+              <div style={{ background: primaryColor + '15', border: `1px solid ${primaryColor}40`, padding: '16px 32px', borderRadius: '16px', display: 'inline-flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: primaryColor, background: primaryColor + '20', padding: '4px 8px', borderRadius: '6px' }}>Java</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: 700, color: textColor }}>
+                  {extras?.site?.serverIp || section.content.serverIp}{extras?.site?.requirePortInJava && extras?.site?.serverPort ? `:${extras.site.serverPort}` : ''}
+                </span>
+              </div>
+              
+              {extras?.site?.bedrockSupported && (
+                <div style={{ background: primaryColor + '08', border: `1px solid ${primaryColor}20`, padding: '16px 32px', borderRadius: '16px', display: 'inline-flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#10b981', background: '#10b98120', padding: '4px 8px', borderRadius: '6px' }}>Bedrock</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 700, color: textColor }}>
+                      {extras.site.bedrockIp || extras.site.serverIp || section.content.serverIp}
+                    </span>
+                  </div>
+                  <div style={{ width: '1px', height: '24px', background: primaryColor + '30' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 800, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: textColor }}>Port</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 700, color: textColor }}>{extras.site.bedrockPort || 19132}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       );
@@ -231,7 +264,7 @@ export default function SectionRenderer({ section, theme, extras }: Props) {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '8px' }}>
                       <h3 style={{ fontWeight: 700, fontSize: '16px', color: textColor }}>{a.title}</h3>
-                      <span style={{ fontSize: '11px', opacity: 0.4, whiteSpace: 'nowrap', color: textColor }}>{new Date(a.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      <span style={{ fontSize: '11px', opacity: 0.4, whiteSpace: 'nowrap', color: textColor }}>{new Date(a.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                     </div>
                     <p style={{ fontSize: '14px', opacity: 0.6, lineHeight: 1.6, color: textColor }}>{a.content}</p>
                   </div>

@@ -1,7 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, ExternalLink, Mail, Shield, Info, MessageSquare, PlayCircle, Send, Code, LogIn, User as UserIcon, LogOut } from 'lucide-react';
+import { Menu, X, ExternalLink, Mail, Shield, Info, MessageSquare, PlayCircle, Send, Code, LogIn, User as UserIcon, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 const BrandIcons = {
@@ -30,19 +30,45 @@ interface NavbarProps {
 export function Navbar({ site, pages }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
-  const { theme, socialLinks, name, authSettings } = site;
+  const { theme, socialLinks, name, authSettings, serverIp } = site;
   const primary = theme.primaryColor;
+  const [serverIcon, setServerIcon] = useState<string>('');
+
+  useEffect(() => {
+    if (serverIp) {
+      fetch(`https://api.mcsrvstat.us/2/${serverIp}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data?.icon) setServerIcon(data.icon);
+        })
+        .catch(() => {});
+    }
+  }, [serverIp]);
 
   const socialButtons = [];
   if (socialLinks?.discord) socialButtons.push({ icon: <BrandIcons.Discord />, href: socialLinks.discord, color: '#5865F2' });
   if (socialLinks?.youtube) socialButtons.push({ icon: <BrandIcons.Youtube />, href: socialLinks.youtube, color: '#FF0000' });
   if (socialLinks?.twitter) socialButtons.push({ icon: <BrandIcons.Twitter />, href: socialLinks.twitter, color: '#1DA1F2' });
 
-  const navPages = [...pages].sort((a, b) => {
-    if (a.slug === 'home') return -1;
-    if (b.slug === 'home') return 1;
-    return a.title.localeCompare(b.title);
-  });
+  const navPages = site.navLinks?.length > 0 
+    ? site.navLinks.filter((l: any) => l.visible)
+    : [...pages].sort((a, b) => {
+        if (a.slug === 'home') return -1;
+        if (b.slug === 'home') return 1;
+        return a.title.localeCompare(b.title);
+      }).map(p => ({
+        label: p.title,
+        url: p.slug === 'home' ? '/' : `/${p.slug}`,
+        isExternal: false
+      }));
+
+  if (user && user.loginType === 'zenuxs') {
+    navPages.push({
+      label: 'Notifications',
+      url: '/notifications',
+      isExternal: false
+    });
+  }
 
   return (
     <>
@@ -78,34 +104,52 @@ export function Navbar({ site, pages }: NavbarProps) {
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ fontWeight: 900, fontSize: '22px', letterSpacing: '-0.03em', color: theme.textColor, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.backgroundColor }}>
-              {name.charAt(0)}
-            </div>
+            {serverIcon ? (
+              <img src={serverIcon} alt="" style={{ width: '32px', height: '32px', borderRadius: '8px', boxShadow: `0 4px 12px ${primary}30` }} />
+            ) : (
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.backgroundColor }}>
+                {name.charAt(0)}
+              </div>
+            )}
             {name}
           </Link>
 
           {/* Desktop Nav */}
           <div className="nav-desktop" style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-            {navPages.map(p => (
-              <Link key={p.slug} href={p.slug === 'home' ? '/' : `/${p.slug}`} className="nav-link"
-                style={{ fontSize: '14px', fontWeight: 600, color: theme.textColor, textDecoration: 'none' }}>
-                {p.title}
-              </Link>
-            ))}
+            {navPages.map((link: any, i: number) => {
+              const url = link.url || (link.slug === 'home' ? '/' : `/${link.slug}`);
+              const label = link.label || link.title;
+              return link.isExternal ? (
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="nav-link" style={{ fontSize: '14px', fontWeight: 600, color: theme.textColor, textDecoration: 'none' }}>
+                  {label}
+                </a>
+              ) : (
+                <Link key={i} href={url} className="nav-link" style={{ fontSize: '14px', fontWeight: 600, color: theme.textColor, textDecoration: 'none' }}>
+                  {label}
+                </Link>
+              );
+            })}
             
             <div style={{ width: '1px', height: '24px', background: theme.textColor + '15' }} />
             
-            {authSettings?.enabled && (
+            {(authSettings?.enabled || site.zenuxsOauth?.enabled) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 {user ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 700, color: theme.textColor }}>
+                    <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 700, color: theme.textColor, textDecoration: 'none' }}>
                       <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: primary + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', color: primary }}>
-                        <UserIcon size={14} />
+                        {user.avatar ? (
+                          <img src={user.avatar} alt="" style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+                        ) : (
+                          <UserIcon size={14} />
+                        )}
                       </div>
-                      {user.username}
-                    </div>
-                    <button onClick={logout} style={{ background: 'none', border: 'none', color: theme.textColor, opacity: 0.4, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Logout">
+                      <span>{user.username}</span>
+                    </Link>
+                    <Link href="/settings" style={{ color: theme.textColor, opacity: 0.4, display: 'flex', alignItems: 'center' }} title="Settings">
+                      <Settings size={16} />
+                    </Link>
+                    <button onClick={logout} style={{ background: 'none', border: 'none', color: theme.textColor, opacity: 0.4, cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }} title="Logout">
                       <LogOut size={16} />
                     </button>
                   </div>
@@ -157,14 +201,21 @@ export function Navbar({ site, pages }: NavbarProps) {
             display: 'flex', flexDirection: 'column', gap: '20px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
           }}>
-            {navPages.map(p => (
-              <Link key={p.slug} href={p.slug === 'home' ? '/' : `/${p.slug}`} onClick={() => setIsOpen(false)}
-                style={{ fontSize: '16px', fontWeight: 700, color: theme.textColor, textDecoration: 'none' }}>
-                {p.title}
-              </Link>
-            ))}
+            {navPages.map((link: any, i: number) => {
+              const url = link.url || (link.slug === 'home' ? '/' : `/${link.slug}`);
+              const label = link.label || link.title;
+              return link.isExternal ? (
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer" onClick={() => setIsOpen(false)} style={{ fontSize: '16px', fontWeight: 700, color: theme.textColor, textDecoration: 'none' }}>
+                  {label}
+                </a>
+              ) : (
+                <Link key={i} href={url} onClick={() => setIsOpen(false)} style={{ fontSize: '16px', fontWeight: 700, color: theme.textColor, textDecoration: 'none' }}>
+                  {label}
+                </Link>
+              );
+            })}
 
-            {authSettings?.enabled && (
+            {(authSettings?.enabled || site.zenuxsOauth?.enabled) && (
               <div style={{ paddingTop: '10px', borderTop: `1px solid ${theme.textColor}10` }}>
                 {user ? (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -177,7 +228,7 @@ export function Navbar({ site, pages }: NavbarProps) {
                   <Link href="/login" onClick={() => setIsOpen(false)} style={{ 
                     display: 'flex', alignItems: 'center', gap: '10px', color: primary, fontWeight: 800, textDecoration: 'none' 
                   }}>
-                    <LogIn size={20} /> Login with Advanced Auth
+                    <LogIn size={20} /> Login
                   </Link>
                 )}
               </div>

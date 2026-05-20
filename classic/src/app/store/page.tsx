@@ -241,7 +241,7 @@ function PaymentModal({
     setError('');
 
     try {
-      const result = await createPaymentOrder(site._id, product._id, form);
+      const result = await createPaymentOrder(site._id, product._id, { ...form, buyerUsername });
 
       if (!result.success) {
         setError(result.error || 'Failed to create payment order');

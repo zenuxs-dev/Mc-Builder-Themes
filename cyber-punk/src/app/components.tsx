@@ -8,7 +8,9 @@ import {
   Shield, Globe, Terminal, Ghost, Box, LogOut, CheckCircle,
   ExternalLink, Copy
 } from 'lucide-react';
+import * as Icons from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { submitForm } from '@/lib/api';
 
 const BrandIcons = {
   Discord: () => (
@@ -26,21 +28,60 @@ const BrandIcons = {
 export function Navbar({ site, pages, accent, mcStatus }: { site: any; pages: any[]; accent: string; mcStatus?: any }) {
   const [active, setActive] = useState('/');
   const { user, logout } = useAuth();
-  const authEnabled = site.authSettings?.enabled;
+  const authEnabled = site.authSettings?.enabled || site.zenuxsOauth?.enabled;
   const serverIcon = mcStatus?.icon;
   
-  const navItems = [
-    { label: 'HOME', href: '/', icon: Home },
-    { label: 'STORE', href: '/store', icon: ShoppingCart },
-    { label: 'STATUS', href: '/status', icon: Activity },
-    { label: 'GALLERY', href: '/gallery', icon: Image },
-    { label: 'FORUMS', href: '/discussions', icon: MessageSquare },
-    { label: 'RANKINGS', href: '/leaderboard', icon: Trophy },
-  ];
+  const getIconForSlug = (slug: string) => {
+    switch (slug) {
+      case 'home': return Home;
+      case 'store': return ShoppingCart;
+      case 'status': return Activity;
+      case 'gallery': return Image;
+      case 'discussions': return MessageSquare;
+      case 'leaderboard': return Trophy;
+      case 'faq': return HelpCircle;
+      case 'about': return Users;
+      default: return FileText;
+    }
+  };
+
+  const getIconNameForSlug = (slug: string): string => {
+    switch (slug) {
+      case 'home': return 'Home';
+      case 'store': return 'ShoppingCart';
+      case 'status': return 'Activity';
+      case 'gallery': return 'Image';
+      case 'discussions': return 'MessageSquare';
+      case 'leaderboard': return 'Trophy';
+      case 'faq': return 'HelpCircle';
+      case 'about': return 'Users';
+      case 'notifications': return 'Bell';
+      default: return 'FileText';
+    }
+  };
 
   const socialLinks = site.socialLinks || {};
-  const navPages = [...pages].filter(p => p.visible && !['home','store','status','gallery','discussions','leaderboard','faq'].includes(p.slug))
-    .sort((a, b) => a.title.localeCompare(b.title));
+  const navPages = site.navLinks?.length > 0 
+    ? site.navLinks.filter((l: any) => l.visible)
+    : [...pages].sort((a, b) => {
+        if (a.slug === 'home') return -1;
+        if (b.slug === 'home') return 1;
+        return a.title.localeCompare(b.title);
+      }).map(p => ({
+        label: p.title,
+        url: p.slug === 'home' ? '/' : `/${p.slug}`,
+        icon: getIconNameForSlug(p.slug),
+        isExternal: false
+      }));
+
+  if (user && user.loginType === 'zenuxs') {
+    navPages.push({
+      label: 'NOTIFICATIONS',
+      url: '/notifications',
+      icon: 'Bell',
+      isExternal: false
+    });
+  }
 
   return (
     <nav className="sidebar-nav">
@@ -58,38 +99,54 @@ export function Navbar({ site, pages, accent, mcStatus }: { site: any; pages: an
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 12px', height: 'calc(100vh - 220px)', overflowY: 'auto' }}>
-        {navItems.map((item) => (
-          <Link key={item.href} href={item.href} onClick={() => setActive(item.href)}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '16px', 
-              padding: '12px 16px', 
-              borderRadius: '12px',
-              color: active === item.href ? accent : '#555',
-              background: active === item.href ? `${accent}10` : 'transparent',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              cursor: 'pointer',
-              position: 'relative',
-              overflow: 'hidden'
-            }} className="glitch-text">
-              <item.icon size={22} style={{ flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, fontSize: '14px', whiteSpace: 'nowrap' }}>{item.label}</span>
-              {active === item.href && <div style={{ position: 'absolute', left: 0, top: '20%', bottom: '20%', width: '3px', background: accent, borderRadius: '0 4px 4px 0', boxShadow: `0 0 10px ${accent}` }} />}
-            </div>
-          </Link>
-        ))}
-
-        <div style={{ margin: '12px 8px', height: '1px', background: 'rgba(255,255,255,0.05)' }} />
-
-        {navPages.map((p) => (
-          <Link key={p._id} href={`/${p.slug}`}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px 16px', borderRadius: '12px', color: '#444' }} className="glitch-text">
-              <FileText size={22} style={{ flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, fontSize: '14px', whiteSpace: 'nowrap' }}>{p.title.toUpperCase()}</span>
-            </div>
-          </Link>
-        ))}
+        {navPages.map((link: any, index: number) => {
+          const Icon = (Icons as any)[link.icon] || getIconForSlug(link.slug || link.url?.replace('/', '')) || Icons.FileText;
+          const href = link.url || (link.slug === 'home' ? '/' : `/${link.slug}`);
+          const label = link.label || link.title;
+          
+          return link.isExternal ? (
+            <a key={index} href={href} target="_blank" rel="noopener noreferrer">
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '16px', 
+                padding: '12px 16px', 
+                borderRadius: '12px',
+                color: active === href ? accent : '#555',
+                background: active === href ? `${accent}10` : 'transparent',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden'
+              }} className="glitch-text">
+                <Icon size={22} style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 700, fontSize: '14px', whiteSpace: 'nowrap' }}>{label.toUpperCase()}</span>
+                <Icons.ExternalLink size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />
+                {active === href && <div style={{ position: 'absolute', left: 0, top: '20%', bottom: '20%', width: '3px', background: accent, borderRadius: '0 4px 4px 0', boxShadow: `0 0 10px ${accent}` }} />}
+              </div>
+            </a>
+          ) : (
+            <Link key={index} href={href} onClick={() => setActive(href)}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '16px', 
+                padding: '12px 16px', 
+                borderRadius: '12px',
+                color: active === href ? accent : '#555',
+                background: active === href ? `${accent}10` : 'transparent',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden'
+              }} className="glitch-text">
+                <Icon size={22} style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 700, fontSize: '14px', whiteSpace: 'nowrap' }}>{label.toUpperCase()}</span>
+                {active === href && <div style={{ position: 'absolute', left: 0, top: '20%', bottom: '20%', width: '3px', background: accent, borderRadius: '0 4px 4px 0', boxShadow: `0 0 10px ${accent}` }} />}
+              </div>
+            </Link>
+          );
+        })}
 
         <div style={{ marginTop: 'auto', padding: '20px 8px' }}>
            <div style={{ display: 'flex', gap: '16px', color: '#222' }}>
@@ -104,11 +161,18 @@ export function Navbar({ site, pages, accent, mcStatus }: { site: any; pages: an
         {authEnabled && (
           user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: accent, color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '12px' }}>{user.username.charAt(0)}</div>
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <p style={{ color: '#fff', fontSize: '11px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.username}</p>
-                <button onClick={logout} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '9px', fontWeight: 800, padding: 0 }}>DEACTIVATE</button>
-              </div>
+              <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, overflow: 'hidden', textDecoration: 'none' }}>
+                {user.avatar ? (
+                  <img src={user.avatar} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', border: `1px solid ${accent}` }} />
+                ) : (
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: accent, color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '12px' }}>{user.username.charAt(0)}</div>
+                )}
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <p style={{ color: '#fff', fontSize: '11px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.username.toUpperCase()}</p>
+                  <p style={{ color: accent, fontSize: '8px', fontWeight: 800, marginTop: '2px' }}>SETTINGS_CP</p>
+                </div>
+              </Link>
+              <button onClick={logout} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '9px', fontWeight: 800, padding: 0, cursor: 'pointer' }}>DEACTIVATE</button>
             </div>
           ) : (
             <Link href="/login">
@@ -135,8 +199,10 @@ export function HeroSection({ site, accent, mcStatus, content, styles }: any) {
     ? content.buttons 
     : (content?.buttonText ? [{ text: content.buttonText, url: content.buttonUrl || '/store' }] : []);
 
+  const javaIp = site.serverIp + (site.requirePortInJava && site.serverPort ? `:${site.serverPort}` : '');
+
   const copyIp = () => {
-    navigator.clipboard.writeText(site.serverIp || 'mc.server.com');
+    navigator.clipboard.writeText(javaIp || 'mc.server.com');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -173,7 +239,7 @@ export function HeroSection({ site, accent, mcStatus, content, styles }: any) {
           {!content?.buttons && (
             <button onClick={copyIp} className="cyber-border" style={{ padding: '18px 30px', background: 'rgba(255,255,255,0.03)', color: '#fff', fontWeight: 800, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '12px', border: 'none', cursor: 'pointer' }}>
               <span style={{ width: '8px', height: '8px', background: mcStatus?.online ? accent : '#ef4444', borderRadius: '50%', boxShadow: `0 0 10px ${mcStatus?.online ? accent : '#ef4444'}` }} />
-              {copied ? 'COPIED_TO_CLIPBOARD' : (site.serverIp || 'mc.server.com')}
+              {copied ? 'COPIED_TO_CLIPBOARD' : (javaIp || 'mc.server.com')}
               <Copy size={16} opacity={0.5} />
             </button>
           )}
@@ -290,7 +356,7 @@ export function NewsSection({ site, announcements, accent, content, styles }: an
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '40px' }}>
         {items.map((a: any, i: number) => (
           <div key={a._id} className="glass-card" style={{ padding: '40px', borderLeft: `4px solid ${accent}` }}>
-            <p style={{ color: accent, fontSize: '11px', fontWeight: 900, marginBottom: '16px' }}>{new Date(a.createdAt).toLocaleDateString().toUpperCase()}</p>
+            <p style={{ color: accent, fontSize: '11px', fontWeight: 900, marginBottom: '16px' }}>{new Date(a.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}</p>
             <h3 style={{ fontSize: '24px', fontWeight: 900, color: '#fff', marginBottom: '16px' }}>{a.title}</h3>
             <p style={{ color: '#888', lineHeight: 1.8, fontSize: '15px' }}>{a.content.substring(0, 150)}...</p>
             <Link href="/announcements" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '13px', fontWeight: 800, marginTop: '24px' }}>
@@ -372,18 +438,33 @@ export function DiscussionsSection({ site, discussions, accent, content, styles 
   const title = content?.title || "COMM_THREADS";
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-      <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#fff', marginBottom: '60px' }}>
-          {title.includes('_') ? <>{title.split('_')[0]}_<span style={{ color: accent }}>{title.split('_')[1]}</span></> : title}
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '60px' }}>
+        <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#fff' }}>
+            {title.includes('_') ? <>{title.split('_')[0]}_<span style={{ color: accent }}>{title.split('_')[1]}</span></> : title}
+        </h2>
+        <Link href="/discussions/new" style={{ textDecoration: 'none' }}>
+          <div className="cyber-border" style={{ padding: '12px 24px', background: `${accent}10`, color: accent, fontSize: '12px', fontWeight: 900, letterSpacing: '0.1em', cursor: 'pointer', transition: '0.2s' }}>
+            + CREATE_THREAD
+          </div>
+        </Link>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {discussions.map((d: any) => (
-          <div key={d._id} className="glass-card" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>{d.title}</h3>
-              <p style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>By {d.authorName || d.author} // {new Date(d.createdAt).toLocaleDateString()}</p>
+          <Link key={d._id} href={`/discussions/${d._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div className="glass-card" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: '0.2s' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>{d.title}</h3>
+                <p style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>By {d.authorName || d.author} // {new Date(d.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>▲ {d.likes?.length || 0}</span>
+                  <span style={{ fontSize: '11px', color: '#444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>▼ {d.dislikes?.length || 0}</span>
+                  <span style={{ fontSize: '11px', color: '#444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>💬 {d.comments?.length || 0}</span>
+                  <span style={{ fontSize: '11px', color: '#444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>👁 {d.views || 0}</span>
+                </div>
+              </div>
+              <ChevronRight size={20} color={accent} />
             </div>
-            <ChevronRight size={20} color={accent} />
-          </div>
+          </Link>
         ))}
       </div>
     </div>
@@ -446,7 +527,7 @@ export function FormsSection({ site, forms, accent, content, styles }: any) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' }}>
         {forms.map((f: any) => (
           <div key={f._id} className="cyber-border" style={{ padding: '32px', background: 'rgba(255,255,255,0.01)' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#fff', marginBottom: '8px' }}>{f.title}</h3>
+              <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#fff', marginBottom: '8px' }}>{f.name || f.title}</h3>
               <p style={{ fontSize: '13px', color: '#555', marginBottom: '24px' }}>{f.description}</p>
               <Link href={`/form/${f._id}`} style={{ color: accent, fontWeight: 900, fontSize: '12px', letterSpacing: '0.1em' }}>INITIATE_APPLICATION →</Link>
           </div>
@@ -531,27 +612,337 @@ export function FeaturesSection({ site, accent, content, styles }: any) {
 }
 
 export function FormRenderer({ form, accent }: any) {
+  const { user } = useAuth();
+  const [values, setValues] = useState<Record<string, any>>(() => {
+    const init: Record<string, any> = {};
+    (form.fields || []).forEach((f: any) => init[f.name || f.label || 'field'] = '');
+    return init;
+  });
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'login_required'>('idle');
+  const [responses, setResponses] = useState<any[]>([]);
+  const [fetchingResponses, setFetchingResponses] = useState(false);
+
+  const fetchMyResponses = async () => {
+    if (!user) return;
+    setFetchingResponses(true);
+    try {
+      const token = user.token || localStorage.getItem('zenuxs_auth_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/forms/${form._id}/my-responses`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setResponses(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setFetchingResponses(false);
+  };
+
+  useEffect(() => {
+    if (user && form?._id) {
+      fetchMyResponses();
+    }
+  }, [user, form?._id]);
+
+  const isAdvRequired = !!form.requireAdvancedAuth;
+  const isZenuxsRequired = !!form.requireZenuxsAuth;
+  const isAnyLoginRequired = isAdvRequired || isZenuxsRequired;
+
+  let isAuthorized = true;
+  if (isAdvRequired && isZenuxsRequired) {
+    isAuthorized = !!user && (user.loginType === 'advanced_auth' || user.loginType === 'zenuxs');
+  } else if (isAdvRequired) {
+    isAuthorized = !!user && user.loginType === 'advanced_auth';
+  } else if (isZenuxsRequired) {
+    isAuthorized = !!user && user.loginType === 'zenuxs';
+  }
+
+  const handleChange = (name: string, v: any) => setValues(s => ({ ...s, [name]: v }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (isAnyLoginRequired && !isAuthorized) {
+      setStatus('login_required');
+      return;
+    }
+
+    setStatus('sending');
+    const payload: any = { data: { ...values } };
+    if (user) {
+      payload.authenticatedUser = user.username;
+      payload.submitterDetails = {
+        userId: user.id || user._id,
+        loginType: user.loginType,
+        name: user.name || user.username,
+        email: user.email,
+        avatar: user.avatar,
+        gamertag: user.loginType === 'advanced_auth' ? user.username : undefined
+      };
+    }
+
+    const res = await submitForm(form._id, payload);
+    if (res.ok) {
+      setStatus('sent');
+      setValues(Object.fromEntries(Object.keys(values).map(k => [k, ''])));
+      fetchMyResponses();
+    } else {
+      setStatus('error');
+    }
+  };
+
   return (
-    <div className="cyber-border" style={{ padding: '60px', background: 'rgba(0,0,0,0.4)' }}>
-       <h2 style={{ fontSize: '32px', fontWeight: 900, color: accent, marginBottom: '24px' }}>{form.title.toUpperCase()}</h2>
-       <p style={{ color: '#555', marginBottom: '40px' }}>SYSTEM READY. WAITING FOR INPUT SEQUENCE.</p>
-       <div style={{ display: 'grid', gap: '20px' }}>
+    <div className="cyber-border" style={{ padding: '40px', background: 'rgba(0,0,0,0.6)', position: 'relative' }}>
+       <h2 style={{ fontSize: '32px', fontWeight: 900, color: accent, marginBottom: '12px', letterSpacing: '-0.02em' }}>{(form.name || form.title || '').toUpperCase()}</h2>
+       <p style={{ color: '#888', marginBottom: '32px', fontSize: '14px', lineHeight: 1.6 }}>{form.description || 'SYSTEM READY. WAITING FOR INPUT SEQUENCE.'}</p>
+
+       {isAnyLoginRequired && (
+         <div style={{ 
+           padding: '16px 20px', 
+           background: isAuthorized ? 'rgba(0, 255, 136, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+           border: `1px solid ${isAuthorized ? 'rgba(0, 255, 136, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
+           marginBottom: '32px',
+           display: 'flex',
+           alignItems: 'center',
+           gap: '12px'
+         }}>
+           <div style={{ color: isAuthorized ? accent : '#ef4444', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 900, letterSpacing: '0.1em' }}>
+             {isAuthorized ? (
+               <>
+                 [AUTHENTICATION_VERIFIED] LOGGED IN AS {user?.username.toUpperCase()}
+               </>
+             ) : (
+               <>
+                 [ACCESS_RESTRICTED] PLEASE <Link href={`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} style={{ color: 'inherit', textDecoration: 'underline' }}>AUTHENTICATE</Link> VIA {isAdvRequired && isZenuxsRequired ? 'ADVANCED_AUTH OR ZENUXS' : isAdvRequired ? 'ADVANCED_AUTH' : 'ZENUXS'}
+               </>
+             )}
+           </div>
+         </div>
+       )}
+
+       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '24px' }}>
           {form.fields?.map((field: any, i: number) => (
             <div key={i}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: '#444', marginBottom: '8px' }}>{field.label.toUpperCase()}</label>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: accent, letterSpacing: '0.15em', marginBottom: '8px' }}>
+                // {field.label.toUpperCase()} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+              </label>
               {field.type === 'textarea' ? (
-                <textarea style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', padding: '16px', color: '#fff', minHeight: '120px' }} placeholder="..." />
+                <textarea 
+                  required={field.required}
+                  value={values[field.name || field.label]}
+                  onChange={e => handleChange(field.name || field.label, e.target.value)}
+                  style={{ 
+                    width: '100%', 
+                    background: 'rgba(0,0,0,0.4)', 
+                    border: '1px solid rgba(255,255,255,0.15)', 
+                    padding: '16px', 
+                    color: '#fff', 
+                    minHeight: '120px', 
+                    outline: 'none',
+                    fontFamily: "'Courier New', Courier, monospace",
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    borderRadius: '4px'
+                  }} 
+                  placeholder="INPUT SYSTEM SEQUENCE..." 
+                  onFocus={e => {
+                    e.currentTarget.style.borderColor = accent;
+                    e.currentTarget.style.boxShadow = `0 0 10px ${accent}40`;
+                    e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.background = 'rgba(0,0,0,0.4)';
+                  }}
+                />
               ) : field.type === 'select' ? (
-                <select style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', padding: '16px', color: '#fff' }}>
-                  {field.options?.map((opt: string, j: number) => <option key={j} value={opt}>{opt}</option>)}
+                <select 
+                  required={field.required}
+                  value={values[field.name || field.label]}
+                  onChange={e => handleChange(field.name || field.label, e.target.value)}
+                  style={{ 
+                    width: '100%', 
+                    background: 'rgba(0,0,0,0.4)', 
+                    border: '1px solid rgba(255,255,255,0.15)', 
+                    padding: '16px', 
+                    color: '#fff', 
+                    outline: 'none',
+                    fontFamily: "'Courier New', Courier, monospace",
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    borderRadius: '4px'
+                  }}
+                  onFocus={e => {
+                    e.currentTarget.style.borderColor = accent;
+                    e.currentTarget.style.boxShadow = `0 0 10px ${accent}40`;
+                    e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.background = 'rgba(0,0,0,0.4)';
+                  }}
+                >
+                  <option value="" disabled style={{ background: '#0a0a0f', color: '#888' }}>SELECT OPTION...</option>
+                  {field.options?.map((opt: string, j: number) => (
+                    <option key={j} value={opt} style={{ background: '#0a0a0f', color: '#fff' }}>{opt.toUpperCase()}</option>
+                  ))}
                 </select>
               ) : (
-                <input type={field.type || 'text'} style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', padding: '16px', color: '#fff' }} placeholder="..." />
+                <input 
+                  type={field.type || 'text'} 
+                  required={field.required}
+                  value={values[field.name || field.label]}
+                  onChange={e => handleChange(field.name || field.label, e.target.value)}
+                  style={{ 
+                    width: '100%', 
+                    background: 'rgba(0,0,0,0.4)', 
+                    border: '1px solid rgba(255,255,255,0.15)', 
+                    padding: '16px', 
+                    color: '#fff', 
+                    outline: 'none',
+                    fontFamily: "'Courier New', Courier, monospace",
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    borderRadius: '4px'
+                  }} 
+                  placeholder="ENTER PARAMETER..." 
+                  onFocus={e => {
+                    e.currentTarget.style.borderColor = accent;
+                    e.currentTarget.style.boxShadow = `0 0 10px ${accent}40`;
+                    e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.background = 'rgba(0,0,0,0.4)';
+                  }}
+                />
               )}
             </div>
           ))}
-          <button style={{ background: accent, color: '#000', padding: '18px', border: 'none', fontWeight: 900, marginTop: '20px' }}>SUBMIT_ENCRYPTED_DATA</button>
-       </div>
+          <button 
+            type="submit"
+            disabled={status === 'sending' || (isAnyLoginRequired && !isAuthorized)}
+            style={{ 
+              background: accent, 
+              color: '#000', 
+              padding: '18px', 
+              border: 'none', 
+              fontWeight: 900, 
+              marginTop: '20px',
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: '0.2em',
+              fontSize: '14px',
+              cursor: (status === 'sending' || (isAnyLoginRequired && !isAuthorized)) ? 'not-allowed' : 'pointer',
+              opacity: (status === 'sending' || (isAnyLoginRequired && !isAuthorized)) ? 0.5 : 1,
+              transition: 'all 0.3s ease',
+              borderRadius: '4px',
+              boxShadow: `0 0 15px ${accent}33`
+            }}
+            onMouseEnter={e => {
+              if (status !== 'sending' && !(isAnyLoginRequired && !isAuthorized)) {
+                e.currentTarget.style.boxShadow = `0 0 25px ${accent}80`;
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.boxShadow = `0 0 15px ${accent}33`;
+              e.currentTarget.style.transform = 'none';
+            }}
+          >
+            {status === 'sending' ? 'TRANSMITTING_DATA...' : 'SUBMIT_ENCRYPTED_DATA'}
+          </button>
+
+          {status === 'sent' && (
+            <div style={{ color: accent, fontSize: '12px', fontWeight: 900, letterSpacing: '0.1em', marginTop: '12px', textAlign: 'center' }}>
+              ✓_TRANSMISSION_COMPLETE_SUCCESS
+            </div>
+          )}
+          {status === 'error' && (
+            <div style={{ color: '#ef4444', fontSize: '12px', fontWeight: 900, letterSpacing: '0.1em', marginTop: '12px', textAlign: 'center' }}>
+              ✗_TRANSMISSION_FAILED_ERROR
+            </div>
+          )}
+          {status === 'login_required' && (
+            <div style={{ color: '#ef4444', fontSize: '12px', fontWeight: 900, letterSpacing: '0.1em', marginTop: '12px', textAlign: 'center' }}>
+              ✗_CREDENTIALS_REQUIRED
+            </div>
+          )}
+       </form>
+
+       {user && (
+         <div style={{ marginTop: '60px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '40px' }}>
+           <h3 style={{ fontSize: '18px', fontWeight: 900, color: accent, marginBottom: '24px', letterSpacing: '0.1em' }}>// SUBMISSION_LOG</h3>
+           {fetchingResponses ? (
+             <p style={{ fontSize: '12px', color: '#555', fontFamily: 'monospace' }}>RETRIEVING_DATA...</p>
+           ) : responses.length === 0 ? (
+             <p style={{ fontSize: '12px', color: '#555', fontFamily: 'monospace' }}>NO_SUBMISSIONS_FOUND</p>
+           ) : (
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+               {responses.map((resp: any) => (
+                 <div key={resp._id} className="cyber-border" style={{ background: 'rgba(0,0,0,0.4)', padding: '24px' }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                       {resp.submitterDetails?.avatar ? (
+                         <img src={resp.submitterDetails.avatar} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${accent}` }} />
+                       ) : (
+                         <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px', color: '#fff', fontFamily: 'monospace' }}>
+                           {(resp.submitterDetails?.name || resp.submitterDetails?.gamertag || '?').charAt(0).toUpperCase()}
+                         </div>
+                       )}
+                       <div>
+                         {resp.submitterDetails?.loginType === 'zenuxs' ? (
+                           <>
+                             <div style={{ fontWeight: 900, fontSize: '13px', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
+                               {(resp.submitterDetails.name || 'Zenuxs User').toUpperCase()}
+                               <span style={{ fontSize: '9px', background: `${accent}15`, color: accent, padding: '2px 6px', border: `1px solid ${accent}40`, fontWeight: 900 }}>ZENUXS</span>
+                             </div>
+                             <div style={{ fontSize: '11px', color: '#555', fontFamily: 'monospace' }}>{resp.submitterDetails.email}</div>
+                           </>
+                         ) : (
+                           <>
+                             <div style={{ fontWeight: 900, fontSize: '13px', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
+                               {(resp.submitterDetails?.gamertag || resp.submittedBy || 'Gamertag').toUpperCase()}
+                               <span style={{ fontSize: '9px', background: '#f59e0b15', color: '#f59e0b', padding: '2px 6px', border: '1px solid #f59e0b40', fontWeight: 900 }}>ADVANCED_AUTH</span>
+                             </div>
+                           </>
+                         )}
+                       </div>
+                     </div>
+                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                       <span style={{ 
+                         fontSize: '10px', 
+                         fontWeight: 900, 
+                         letterSpacing: '0.1em',
+                         textTransform: 'uppercase', 
+                         padding: '4px 10px', 
+                         background: resp.status === 'Accepted' || resp.status === 'accepted' ? 'rgba(0, 255, 136, 0.1)' : resp.status === 'Rejected' || resp.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : resp.status === 'Under Review' || resp.status === 'under review' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(255,255,255,0.05)',
+                         color: resp.status === 'Accepted' || resp.status === 'accepted' ? accent : resp.status === 'Rejected' || resp.status === 'rejected' ? '#ef4444' : resp.status === 'Under Review' || resp.status === 'under review' ? '#f59e0b' : '#888',
+                         border: `1px solid ${resp.status === 'Accepted' || resp.status === 'accepted' ? 'rgba(0, 255, 136, 0.3)' : resp.status === 'Rejected' || resp.status === 'rejected' ? 'rgba(239, 68, 68, 0.3)' : resp.status === 'Under Review' || resp.status === 'under review' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(255,255,255,0.1)'}`
+                       }}>
+                         {resp.status || 'pending'}
+                       </span>
+                       <span style={{ fontSize: '10px', color: '#444', fontFamily: 'monospace' }}>{new Date(resp.createdAt).toLocaleString()}</span>
+                     </div>
+                   </div>
+
+                   <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                     {Object.entries(resp.data || {}).map(([key, val]: any) => (
+                       <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontFamily: 'monospace' }}>
+                         <span style={{ color: '#555' }}>//{key.toUpperCase()}:</span>
+                         <span style={{ fontWeight: 700, color: '#fff' }}>{String(val)}</span>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               ))}
+             </div>
+           )}
+         </div>
+       )}
     </div>
   );
 }

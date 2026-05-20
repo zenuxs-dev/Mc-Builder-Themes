@@ -1,3 +1,5 @@
+import { cache } from 'react';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 const API_BASE = API_URL.replace(/\/api\/?$/, '');
 const SITE_KEY = (process.env.NEXT_PUBLIC_SITE_KEY || '1031d301f914b747ff9fc6d4e011c210').trim();
@@ -25,15 +27,15 @@ function normalizeUploads(obj: any): any {
   return out;
 }
 
-export async function getSite() {
+export const getSite = cache(async function getSite() {
   if (!SITE_KEY) return null;
   try {
-    const res = await fetch(`${API_URL}/sites/key/${SITE_KEY}`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/sites/key/${SITE_KEY}`, { next: { revalidate: 10 } });
     if (!res.ok) return null;
     const j = await res.json();
     return normalizeUploads(j);
   } catch { return null; }
-}
+});
 
 export async function getPage(siteId: string, slug: string) {
   try {
@@ -112,7 +114,7 @@ export async function submitForm(formId: string, data: any) {
 export async function createPaymentOrder(
   siteId: string,
   productId: string,
-  buyerInfo: { payerName: string; payerEmail: string; payerContact?: string; note?: string }
+  buyerInfo: { payerName: string; payerEmail: string; payerContact?: string; note?: string; buyerUsername?: string }
 ) {
   try {
     const res = await fetch(`${API_URL}/payments/zenuxs/create-order`, {

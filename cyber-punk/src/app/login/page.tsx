@@ -16,12 +16,78 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    getSite().then(setSite);
-  }, []);
+    getSite().then((siteData) => {
+      setSite(siteData);
+      if (!siteData) return;
+
+      // Check for Zenuxs OAuth callback query parameters
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const state = params.get('state');
+
+      if (code && state) {
+        // Prevent duplicate execution during double-mount in StrictMode
+        const processedCodeKey = `zenuxs_processed_code_${code}`;
+        if (sessionStorage.getItem(processedCodeKey)) {
+          return;
+        }
+        sessionStorage.setItem(processedCodeKey, 'true');
+
+        setLoading(true);
+        setError('');
+        const savedState = localStorage.getItem('zenuxs_oauth_state') || '';
+        const savedVerifier = localStorage.getItem('zenuxs_oauth_verifier') || '';
+        const siteKey = siteData.siteKey;
+        const redirectUri = `${window.location.origin}/login`;
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+        fetch(`${API_URL}/auth/zenuxs/callback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            siteKey,
+            fullUrl: window.location.href,
+            state: savedState,
+            codeVerifier: savedVerifier,
+            redirectUri,
+            mergeUserId: localStorage.getItem('zenuxs_merge_user_id') || undefined
+          })
+        })
+          .then((res) => {
+            if (!res.ok) {
+              return res.json().then((errData) => {
+                throw new Error(errData.error || 'OAuth verification failed');
+              });
+            }
+            return res.json();
+          })
+          .then((data) => {
+            login(data.username, data.token, 'zenuxs');
+            localStorage.removeItem('zenuxs_oauth_state');
+            localStorage.removeItem('zenuxs_oauth_verifier');
+
+            const savedRedirect = localStorage.getItem('zenuxs_oauth_redirect');
+            localStorage.removeItem('zenuxs_oauth_redirect');
+            localStorage.removeItem('zenuxs_merge_user_id'); // Clear it after use
+            const redirect = savedRedirect || params.get('redirect') || '/';
+            router.push(redirect);
+          })
+          .catch((err) => {
+            setError(err.message || 'Failed to complete Zenuxs OAuth login.');
+            setLoading(false);
+          });
+      }
+    });
+  }, [router, login]);
 
   useEffect(() => {
-    if (user) {
-      router.push('/');
+    // Only redirect if they are not in the middle of a callback
+    const params = new URLSearchParams(window.location.search);
+    if (user && !params.get('code')) {
+      const redirect = params.get('redirect') || '/';
+      router.push(redirect);
     }
   }, [user, router]);
 
@@ -49,8 +115,10 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.valid) {
-        login(data.username, apiKey);
-        router.push('/');
+        const params = new URLSearchParams(window.location.search);
+        login(data.username, apiKey, 'advanced_auth');
+        const redirect = params.get('redirect') || '/';
+        router.push(redirect);
       } else {
         setError('INVALID_CREDENTIALS_ACCESS_DENIED');
       }
@@ -61,9 +129,54 @@ export default function LoginPage() {
     }
   };
 
+  const handleZenuxsLogin = async () => {
+    setError('');
+    setLoading(true);
+
+    if (!site?.zenuxsOauth?.enabled) {
+      setError('ZENUXS_OAUTH_SECTOR_NOT_ACTIVE');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const siteKey = site.siteKey;
+      const redirectUri = `${window.location.origin}/login`;
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      if (redirect) {
+        localStorage.setItem('zenuxs_oauth_redirect', redirect);
+      }
+      
+      if (user) {
+        localStorage.setItem('zenuxs_merge_user_id', user.id || user._id || '');
+      }
+
+      const res = await fetch(`${API_URL}/auth/zenuxs/login?siteKey=${siteKey}&redirectUri=${encodeURIComponent(redirectUri)}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to initiate Zenuxs OAuth login');
+      }
+
+      const data = await res.json();
+      
+      localStorage.setItem('zenuxs_oauth_state', data.state);
+      localStorage.setItem('zenuxs_oauth_verifier', data.codeVerifier);
+
+      window.location.href = data.url;
+    } catch (err: any) {
+      setError(err.message || 'Failed to initiate Zenuxs OAuth login.');
+      setLoading(false);
+    }
+  };
+
   if (!site) return null;
 
   const accent = site.theme.primaryColor || '#00ff88';
+  const isAdvEnabled = site?.authSettings?.enabled;
+  const isZenuxsEnabled = site?.zenuxsOauth?.enabled;
 
   return (
     <div style={{ 
@@ -108,98 +221,153 @@ export default function LoginPage() {
           <p style={{ fontSize: '12px', color: accent, fontWeight: 900, letterSpacing: '0.2em', opacity: 0.6 }}>SYSTEM AUTHENTICATION REQ_V2.0</p>
         </div>
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {error && (
-            <div style={{ 
-              padding: '16px', 
-              background: '#ef444410', 
-              border: '1px solid #ef444430', 
-              color: '#ef4444', 
-              fontSize: '11px', 
-              fontWeight: 900,
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px',
-              letterSpacing: '0.05em'
-            }}>
-              <AlertCircle size={16} />
-              {error}
-            </div>
-          )}
+        {error && (
+          <div style={{ 
+            padding: '16px', 
+            background: '#ef444410', 
+            border: '1px solid #ef444430', 
+            color: '#ef4444', 
+            fontSize: '11px', 
+            fontWeight: 900,
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px',
+            letterSpacing: '0.05em',
+            marginBottom: '24px'
+          }}>
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
 
-          <div style={{ position: 'relative' }}>
-             <label style={{ display: 'block', fontSize: '10px', fontWeight: 900, color: '#444', marginBottom: '8px', letterSpacing: '0.1em' }}>USER_IDENTIFIER</label>
-             <div style={{ position: 'relative' }}>
-                <input 
-                  type="text" 
-                  required
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
+        {!isAdvEnabled && !isZenuxsEnabled ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <p style={{ opacity: 0.5, fontSize: '13px', letterSpacing: '0.05em' }}>AUTHENTICATION_NOT_CONFIGURED</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {isAdvEnabled && (
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ position: 'relative' }}>
+                   <label style={{ display: 'block', fontSize: '10px', fontWeight: 900, color: '#444', marginBottom: '8px', letterSpacing: '0.1em' }}>USER_IDENTIFIER</label>
+                   <div style={{ position: 'relative' }}>
+                      <input 
+                        type="text" 
+                        required
+                        value={username}
+                        onChange={e => setUsername(e.target.value)}
+                        style={{ 
+                          width: '100%', 
+                          background: 'rgba(255,255,255,0.02)', 
+                          border: '1px solid rgba(255,255,255,0.1)', 
+                          padding: '18px 24px', 
+                          fontSize: '15px',
+                          color: 'white',
+                          outline: 'none',
+                          transition: '0.3s'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = accent}
+                        onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}
+                      />
+                   </div>
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                   <label style={{ display: 'block', fontSize: '10px', fontWeight: 900, color: '#444', marginBottom: '8px', letterSpacing: '0.1em' }}>ACCESS_PHRASE</label>
+                   <input 
+                     type="password" 
+                     required
+                     value={password}
+                     onChange={e => setPassword(e.target.value)}
+                     style={{ 
+                       width: '100%', 
+                       background: 'rgba(255,255,255,0.02)', 
+                       border: '1px solid rgba(255,255,255,0.1)', 
+                       padding: '18px 24px', 
+                       fontSize: '15px',
+                       color: 'white',
+                       outline: 'none',
+                       transition: '0.3s'
+                     }}
+                     onFocus={e => e.currentTarget.style.borderColor = accent}
+                     onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}
+                   />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={loading}
                   style={{ 
-                    width: '100%', 
-                    background: 'rgba(255,255,255,0.02)', 
-                    border: '1px solid rgba(255,255,255,0.1)', 
-                    padding: '18px 24px', 
-                    fontSize: '15px',
-                    color: 'white',
-                    outline: 'none',
-                    transition: '0.3s'
+                    background: accent, 
+                    color: '#000', 
+                    padding: '20px', 
+                    border: 'none', 
+                    fontWeight: 900, 
+                    fontSize: '14px', 
+                    cursor: loading ? 'not-allowed' : 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '12px',
+                    transition: '0.3s',
+                    marginTop: '12px',
+                    letterSpacing: '0.1em',
+                    width: '100%'
                   }}
-                  onFocus={e => e.currentTarget.style.borderColor = accent}
-                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}
-                />
-             </div>
-          </div>
-
-          <div style={{ position: 'relative' }}>
-             <label style={{ display: 'block', fontSize: '10px', fontWeight: 900, color: '#444', marginBottom: '8px', letterSpacing: '0.1em' }}>ACCESS_PHRASE</label>
-             <input 
-               type="password" 
-               required
-               value={password}
-               onChange={e => setPassword(e.target.value)}
-               style={{ 
-                 width: '100%', 
-                 background: 'rgba(255,255,255,0.02)', 
-                 border: '1px solid rgba(255,255,255,0.1)', 
-                 padding: '18px 24px', 
-                 fontSize: '15px',
-                 color: 'white',
-                 outline: 'none',
-                 transition: '0.3s'
-               }}
-               onFocus={e => e.currentTarget.style.borderColor = accent}
-               onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}
-             />
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={loading}
-            style={{ 
-              background: accent, 
-              color: '#000', 
-              padding: '20px', 
-              border: 'none', 
-              fontWeight: 900, 
-              fontSize: '14px', 
-              cursor: loading ? 'not-allowed' : 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              gap: '12px',
-              transition: '0.3s',
-              marginTop: '12px',
-              letterSpacing: '0.1em'
-            }}
-          >
-            {loading ? 'CONNECTING...' : (
-              <>
-                BYPASS_FIREWALL <Zap size={18} />
-              </>
+                >
+                  {loading ? 'CONNECTING...' : (
+                    <>
+                      BYPASS_FIREWALL <Zap size={18} />
+                    </>
+                  )}
+                </button>
+              </form>
             )}
-          </button>
-        </form>
+
+            {isAdvEnabled && isZenuxsEnabled && (
+              <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', opacity: 0.15 }}>
+                <div style={{ flex: 1, height: '1px', background: 'white' }} />
+                <span style={{ padding: '0 12px', fontSize: '10px', fontWeight: 900, letterSpacing: '0.25em' }}>OR</span>
+                <div style={{ flex: 1, height: '1px', background: 'white' }} />
+              </div>
+            )}
+
+            {isZenuxsEnabled && (
+              <button 
+                type="button"
+                onClick={handleZenuxsLogin}
+                disabled={loading}
+                style={{ 
+                  background: 'transparent',
+                  border: `2px solid ${accent}`,
+                  color: accent, 
+                  padding: '20px', 
+                  fontWeight: 900, 
+                  fontSize: '14px', 
+                  cursor: loading ? 'not-allowed' : 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '12px',
+                  transition: '0.3s',
+                  width: '100%',
+                  letterSpacing: '0.1em',
+                  boxShadow: `0 0 15px ${accent}20`
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = accent;
+                  e.currentTarget.style.color = '#000';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = accent;
+                }}
+              >
+                {user ? 'Link Zenuxs Account' : 'Login with Zenuxs'}
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ textAlign: 'center', marginTop: '40px' }}>
           <Link href="/" style={{ fontSize: '11px', opacity: 0.3, textDecoration: 'none', color: '#fff', fontWeight: 900, letterSpacing: '0.1em' }} onMouseEnter={e => e.currentTarget.style.opacity = '1'} onMouseLeave={e => e.currentTarget.style.opacity = '0.3'}>

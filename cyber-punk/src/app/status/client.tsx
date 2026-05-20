@@ -69,6 +69,41 @@ export function StatusClient({ site, pages, mcStatus: initialMcStatus }: { site:
             )}
           </div>
 
+          {/* Connection Instructions */}
+          <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', marginBottom: '24px' }}>Connection Details</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '20px' }}>
+                <p style={{ fontSize: '11px', fontWeight: 800, color: accent, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Java Edition</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', fontWeight: 800 }}>Server Address</p>
+                    <p style={{ fontSize: '18px', fontWeight: 900, color: '#fff', fontFamily: 'monospace' }}>
+                      {site.serverIp}{site.requirePortInJava && site.serverPort ? `:${site.serverPort}` : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => { navigator.clipboard.writeText(site.serverIp + (site.requirePortInJava && site.serverPort ? `:${site.serverPort}` : '')); }} style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+              
+              {site.bedrockSupported && (
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '20px' }}>
+                  <p style={{ fontSize: '11px', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Bedrock Edition</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px' }}>
+                    <div>
+                      <p style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', fontWeight: 800 }}>Server Address</p>
+                      <p style={{ fontSize: '18px', fontWeight: 900, color: '#fff', fontFamily: 'monospace', marginBottom: '8px' }}>{site.bedrockIp || site.serverIp}</p>
+                      <p style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', fontWeight: 800 }}>Port</p>
+                      <p style={{ fontSize: '16px', fontWeight: 900, color: '#fff', fontFamily: 'monospace' }}>{site.bedrockPort || 19132}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Uptime */}
           <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

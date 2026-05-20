@@ -7,25 +7,66 @@ import {
   ChevronRight, Sparkles, Star, Zap, Shield, Heart,
   LogOut, ExternalLink, Copy
 } from 'lucide-react';
+import * as Icons from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { submitForm } from '@/lib/api';
 
 // ─── Bottom Dock Navigation ──────────────────────
 export function Navbar({ site, pages, primary, mcStatus }: { site: any; primary: string; pages: any[]; mcStatus?: any }) {
   const [active, setActive] = useState('/');
   const { user, logout } = useAuth();
-  const authEnabled = site.authSettings?.enabled;
+  const authEnabled = site.authSettings?.enabled || site.zenuxsOauth?.enabled;
   const serverIcon = mcStatus?.icon;
   
-  const navItems = [
-    { label: 'Home', href: '/', icon: Home },
-    { label: 'Store', href: '/store', icon: ShoppingCart },
-    { label: 'Status', href: '/status', icon: Activity },
-    { label: 'Gallery', href: '/gallery', icon: Image },
-    { label: 'Forums', href: '/discussions', icon: MessageSquare },
-  ];
+  const getIconForSlug = (slug: string) => {
+    switch (slug) {
+      case 'home': return Home;
+      case 'store': return ShoppingCart;
+      case 'status': return Activity;
+      case 'gallery': return Image;
+      case 'discussions': return MessageSquare;
+      case 'leaderboard': return Trophy;
+      case 'faq': return HelpCircle;
+      case 'about': return Users;
+      default: return FileText;
+    }
+  };
 
-  const navPages = [...pages].filter(p => p.visible && !['home','store','status','gallery','discussions','leaderboard','faq'].includes(p.slug))
-    .sort((a, b) => a.title.localeCompare(b.title));
+  const getIconNameForSlug = (slug: string): string => {
+    switch (slug) {
+      case 'home': return 'Home';
+      case 'store': return 'ShoppingCart';
+      case 'status': return 'Activity';
+      case 'gallery': return 'Image';
+      case 'discussions': return 'MessageSquare';
+      case 'leaderboard': return 'Trophy';
+      case 'faq': return 'HelpCircle';
+      case 'about': return 'Users';
+      default: return 'FileText';
+    }
+  };
+
+  const navPages = site.navLinks?.length > 0 
+    ? site.navLinks.filter((l: any) => l.visible)
+    : [...pages].sort((a, b) => {
+        if (a.slug === 'home') return -1;
+        if (b.slug === 'home') return 1;
+        return a.title.localeCompare(b.title);
+      }).map(p => ({
+        label: p.title,
+        url: p.slug === 'home' ? '/' : `/${p.slug}`,
+        icon: getIconNameForSlug(p.slug),
+        isExternal: false
+      }));
+
+  if (user && user.loginType === 'zenuxs') {
+    navPages.push({
+      label: 'Notifications',
+      url: '/notifications',
+      icon: 'Bell',
+      isExternal: false
+    });
+  }
 
   return (
     <div className="dock-container">
@@ -35,32 +76,43 @@ export function Navbar({ site, pages, primary, mcStatus }: { site: any; primary:
         </div>
       )}
       <nav className="dock">
-        {navItems.map((item) => (
-          <Link key={item.href} href={item.href} onClick={() => setActive(item.href)}>
-            <div className="dock-item" data-label={item.label} style={{ color: active === item.href ? primary : '#1a1a2e' }}>
-              <item.icon size={22} />
-              {active === item.href && <div style={{ position: 'absolute', bottom: '4px', width: '4px', height: '4px', borderRadius: '50%', background: primary }} />}
-            </div>
-          </Link>
-        ))}
-        
-        {navPages.length > 0 && <div style={{ width: '1px', height: '24px', background: 'rgba(0,0,0,0.06)', margin: '0 4px' }} />}
-        
-        {navPages.map((p) => (
-          <Link key={p._id} href={`/${p.slug}`} onClick={() => setActive(`/${p.slug}`)}>
-            <div className="dock-item" data-label={p.title} style={{ color: active === `/${p.slug}` ? primary : '#1a1a2e' }}>
-              <FileText size={20} />
-            </div>
-          </Link>
-        ))}
+        {navPages.map((link: any, index: number) => {
+          const Icon = (Icons as any)[link.icon] || getIconForSlug(link.slug || link.url?.replace('/', '')) || Icons.FileText;
+          const href = link.url || (link.slug === 'home' ? '/' : `/${link.slug}`);
+          const label = link.label || link.title;
+          
+          return link.isExternal ? (
+            <a key={index} href={href} target="_blank" rel="noopener noreferrer">
+              <div className="dock-item" data-label={label} style={{ color: active === href ? primary : '#1a1a2e' }}>
+                <Icon size={22} />
+                <Icons.ExternalLink size={12} style={{ position: 'absolute', top: '4px', right: '4px', opacity: 0.5 }} />
+                {active === href && <div style={{ position: 'absolute', bottom: '4px', width: '4px', height: '4px', borderRadius: '50%', background: primary }} />}
+              </div>
+            </a>
+          ) : (
+            <Link key={index} href={href} onClick={() => setActive(href)}>
+              <div className="dock-item" data-label={label} style={{ color: active === href ? primary : '#1a1a2e' }}>
+                <Icon size={22} />
+                {active === href && <div style={{ position: 'absolute', bottom: '4px', width: '4px', height: '4px', borderRadius: '50%', background: primary }} />}
+              </div>
+            </Link>
+          );
+        })}
 
         <div style={{ width: '1px', height: '24px', background: 'rgba(0,0,0,0.06)', margin: '0 4px' }} />
         
         {authEnabled && (
           user ? (
-            <div className="dock-item" data-label={user.username} onClick={logout} style={{ color: '#ef4444' }}>
-              <LogOut size={20} />
-            </div>
+            <>
+              <Link href="/settings">
+                <div className="dock-item" data-label="Settings" style={{ color: '#1a1a2e' }}>
+                  <Icons.Settings size={20} />
+                </div>
+              </Link>
+              <div className="dock-item" data-label="Logout" onClick={logout} style={{ color: '#ef4444' }}>
+                <LogOut size={20} />
+              </div>
+            </>
           ) : (
             <Link href="/login">
               <div className="dock-item" data-label="Login">
@@ -81,9 +133,10 @@ export function HeroSection({ site, primary, mcStatus, content, styles }: any) {
   const tag = content?.subtitle || "✨ The Next Chapter";
   const description = content?.description || content?.subtitle || "Titan isn't just a server. It's a curated digital playground designed for those who seek the extraordinary.";
   const buttonText = content?.buttonText || "Get Started";
+  const javaIp = site.serverIp + (site.requirePortInJava && site.serverPort ? `:${site.serverPort}` : '');
 
   const copyIp = () => {
-    navigator.clipboard.writeText(site.serverIp || 'mc.server.com');
+    navigator.clipboard.writeText(javaIp || 'mc.server.com');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -108,7 +161,7 @@ export function HeroSection({ site, primary, mcStatus, content, styles }: any) {
         </Link>
         <button onClick={copyIp} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#fff', padding: '10px 24px', borderRadius: '20px', border: '1px solid #eee', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
           <div style={{ width: '8px', height: '8px', background: mcStatus?.online ? '#22c55e' : '#ef4444', borderRadius: '50%' }} />
-          {copied ? 'Copied!' : (site.serverIp || 'mc.server.com')}
+          {copied ? 'Copied!' : (javaIp || 'mc.server.com')}
           <Copy size={16} opacity={0.3} />
         </button>
       </div>
@@ -136,6 +189,33 @@ export function ServerStatusSection({ site, mcStatus, primary, content, styles }
          <Link href="/status" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: primary, fontWeight: 700 }}>
            View Live Metrics <ArrowRight size={18} />
          </Link>
+
+         <div style={{ marginTop: '48px', display: 'grid', gap: '24px' }}>
+           <div style={{ padding: '24px', borderRadius: '24px', background: '#f5f5f5', border: '1px solid #eee' }}>
+             <p style={{ fontSize: '11px', fontWeight: 800, color: primary, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Java Edition</p>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+               <div>
+                 <p style={{ fontSize: '18px', fontWeight: 900, color: '#1a1a2e', fontFamily: 'monospace' }}>
+                   {site.serverIp}{site.requirePortInJava && site.serverPort ? `:${site.serverPort}` : ''}
+                 </p>
+               </div>
+             </div>
+           </div>
+
+           {site.bedrockSupported && (
+             <div style={{ padding: '24px', borderRadius: '24px', background: '#f5f5f5', border: '1px solid #eee' }}>
+               <p style={{ fontSize: '11px', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Bedrock Edition</p>
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <div>
+                   <p style={{ fontSize: '18px', fontWeight: 900, color: '#1a1a2e', fontFamily: 'monospace' }}>
+                     {site.bedrockIp || site.serverIp}
+                   </p>
+                   <p style={{ fontSize: '12px', fontWeight: 800, color: '#6b7280', marginTop: '4px' }}>Port: {site.bedrockPort || 19132}</p>
+                 </div>
+               </div>
+             </div>
+           )}
+         </div>
       </div>
       
       <div className="glass-2" style={{ padding: '48px', borderRadius: '40px' }}>
@@ -232,7 +312,7 @@ export function NewsSection({ site, announcements, primary, content, styles }: a
         {announcements.slice(0, 3).map((a: any, i: number) => (
           <div key={a._id} className="reveal" style={{ animationDelay: `${0.2 * i}s`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '32px', borderRadius: '24px', background: '#fff', border: '1px solid #eee' }}>
             <div>
-              <p style={{ fontSize: '11px', fontWeight: 800, opacity: 0.3, marginBottom: '8px' }}>{new Date(a.createdAt).toLocaleDateString()}</p>
+              <p style={{ fontSize: '11px', fontWeight: 800, opacity: 0.3, marginBottom: '8px' }}>{new Date(a.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
               <h3 style={{ fontSize: '20px', fontWeight: 700 }}>{a.title}</h3>
             </div>
             <Link href="/announcements" style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
@@ -293,16 +373,29 @@ export function DiscussionsSection({ site, discussions, primary, content, styles
   const title = content?.title || "Community";
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-      <h2 className="serif" style={{ fontSize: '64px', textAlign: 'center', marginBottom: '80px' }}>{title}</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '80px' }}>
+        <h2 className="serif" style={{ fontSize: '64px' }}>{title}</h2>
+        <Link href="/discussions/new" style={{ textDecoration: 'none', background: primary, color: '#fff', padding: '14px 28px', fontWeight: 500, fontFamily: 'serif', fontSize: '15px', transition: '0.3s' }}>
+          Start Discussion
+        </Link>
+      </div>
       <div style={{ display: 'grid', gap: '16px' }}>
         {discussions.map((d: any) => (
-          <div key={d._id} className="reveal" style={{ padding: '32px', borderRadius: '24px', background: '#fff', border: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ fontSize: '20px', fontWeight: 700 }}>{d.title}</h3>
-              <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>Posted by {d.author}</p>
+          <Link key={d._id} href={`/discussions/${d._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div className="reveal" style={{ padding: '32px', borderRadius: '24px', background: '#fff', border: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: '0.2s' }}>
+              <div>
+                <h3 style={{ fontSize: '20px', fontWeight: 700 }}>{d.title}</h3>
+                <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>Posted by {d.authorName || d.author} · {new Date(d.createdAt).toLocaleDateString()}</p>
+                <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>👍 {d.likes?.length || 0}</span>
+                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>👎 {d.dislikes?.length || 0}</span>
+                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>💬 {d.comments?.length || 0}</span>
+                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>👁 {d.views || 0}</span>
+                </div>
+              </div>
+              <ChevronRight color={primary} />
             </div>
-            <Link href="/discussions" style={{ color: primary }}><ChevronRight /></Link>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
@@ -353,7 +446,7 @@ export function FormsSection({ site, forms, primary, content, styles }: any) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '32px' }}>
          {forms.map((f: any) => (
             <div key={f._id} className="reveal" style={{ padding: '40px', borderRadius: '32px', background: '#fff', border: '1px solid #eee' }}>
-              <h3 className="serif" style={{ fontSize: '24px', marginBottom: '12px' }}>{f.title}</h3>
+              <h3 className="serif" style={{ fontSize: '24px', marginBottom: '12px' }}>{f.name || f.title}</h3>
               <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '32px', lineHeight: 1.6 }}>{f.description}</p>
               <Link href={`/form/${f._id}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: primary, fontWeight: 700 }}>
                 Begin Application <ArrowRight size={18} />
@@ -423,27 +516,256 @@ export function FeaturesSection({ site, primary, content, styles }: any) {
 }
 
 export function FormRenderer({ form, primary }: any) {
+  const { user } = useAuth();
+  const [values, setValues] = useState<Record<string, any>>(() => {
+    const init: Record<string, any> = {};
+    (form.fields || []).forEach((f: any) => init[f.name || f.label || 'field'] = '');
+    return init;
+  });
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'login_required'>('idle');
+  const [responses, setResponses] = useState<any[]>([]);
+  const [fetchingResponses, setFetchingResponses] = useState(false);
+
+  const fetchMyResponses = async () => {
+    if (!user) return;
+    setFetchingResponses(true);
+    try {
+      const token = user.token || localStorage.getItem('zenuxs_auth_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/forms/${form._id}/my-responses`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setResponses(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setFetchingResponses(false);
+  };
+
+  useEffect(() => {
+    if (user && form?._id) {
+      fetchMyResponses();
+    }
+  }, [user, form?._id]);
+
+  const isAdvRequired = !!form.requireAdvancedAuth;
+  const isZenuxsRequired = !!form.requireZenuxsAuth;
+  const isAnyLoginRequired = isAdvRequired || isZenuxsRequired;
+
+  let isAuthorized = true;
+  if (isAdvRequired && isZenuxsRequired) {
+    isAuthorized = !!user && (user.loginType === 'advanced_auth' || user.loginType === 'zenuxs');
+  } else if (isAdvRequired) {
+    isAuthorized = !!user && user.loginType === 'advanced_auth';
+  } else if (isZenuxsRequired) {
+    isAuthorized = !!user && user.loginType === 'zenuxs';
+  }
+
+  const handleChange = (name: string, v: any) => setValues(s => ({ ...s, [name]: v }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (isAnyLoginRequired && !isAuthorized) {
+      setStatus('login_required');
+      return;
+    }
+
+    setStatus('sending');
+    const payload: any = { data: { ...values } };
+    if (user) {
+      payload.authenticatedUser = user.username;
+      payload.submitterDetails = {
+        userId: user.id || user._id,
+        loginType: user.loginType,
+        name: user.name || user.username,
+        email: user.email,
+        avatar: user.avatar,
+        gamertag: user.loginType === 'advanced_auth' ? user.username : undefined
+      };
+    }
+
+    const res = await submitForm(form._id, payload);
+    if (res.ok) {
+      setStatus('sent');
+      setValues(Object.fromEntries(Object.keys(values).map(k => [k, ''])));
+      fetchMyResponses();
+    } else {
+      setStatus('error');
+    }
+  };
+
   return (
     <div style={{ padding: '80px 40px', maxWidth: '600px', margin: '0 auto', background: '#fff', borderRadius: '48px', border: '1px solid #eee', boxShadow: '0 40px 100px rgba(0,0,0,0.05)' }}>
-      <h2 className="serif" style={{ fontSize: '40px', marginBottom: '16px' }}>{form.title}</h2>
+      <h2 className="serif" style={{ fontSize: '40px', marginBottom: '16px' }}>{form.name || form.title}</h2>
       <p style={{ color: '#6b7280', marginBottom: '48px' }}>{form.description}</p>
-      <div style={{ display: 'grid', gap: '24px' }}>
+
+      {isAnyLoginRequired && (
+        <div style={{ 
+          padding: '16px 20px', 
+          borderRadius: '20px', 
+          background: isAuthorized ? 'rgba(34, 197, 94, 0.05)' : 'rgba(234, 179, 8, 0.05)',
+          border: `1px solid ${isAuthorized ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)'}`,
+          marginBottom: '32px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: isAuthorized ? '#22c55e' : '#eab308' }}>
+            {isAuthorized ? (
+              <>
+                Logged in as <strong>{user?.username}</strong>. Your username will be attached to this submission.
+              </>
+            ) : (
+              <>
+                Login Required. You must <Link href={`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} style={{ color: 'inherit', textDecoration: 'underline' }}>Login</Link> with {isAdvRequired && isZenuxsRequired ? 'Advanced Auth or Zenuxs' : isAdvRequired ? 'Advanced Auth' : 'Zenuxs'} to submit this form.
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '24px' }}>
         {form.fields?.map((field: any, i: number) => (
           <div key={i}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1a1a2e', marginBottom: '10px' }}>{field.label}</label>
             {field.type === 'textarea' ? (
-              <textarea style={{ width: '100%', padding: '16px 20px', borderRadius: '16px', border: '1px solid #eee', outline: 'none', minHeight: '120px' }} placeholder="..." />
+              <textarea 
+                required={field.required}
+                value={values[field.name || field.label]}
+                onChange={e => handleChange(field.name || field.label, e.target.value)}
+                style={{ width: '100%', padding: '16px 20px', borderRadius: '16px', border: '1px solid #eee', outline: 'none', minHeight: '120px' }} 
+                placeholder="..." 
+              />
             ) : field.type === 'select' ? (
-              <select style={{ width: '100%', padding: '16px 20px', borderRadius: '16px', border: '1px solid #eee', outline: 'none' }}>
+              <select 
+                required={field.required}
+                value={values[field.name || field.label]}
+                onChange={e => handleChange(field.name || field.label, e.target.value)}
+                style={{ width: '100%', padding: '16px 20px', borderRadius: '16px', border: '1px solid #eee', outline: 'none' }}
+              >
+                <option value="" disabled>Select option...</option>
                 {field.options?.map((opt: string, j: number) => <option key={j} value={opt}>{opt}</option>)}
               </select>
             ) : (
-              <input type={field.type || 'text'} style={{ width: '100%', padding: '16px 20px', borderRadius: '16px', border: '1px solid #eee', outline: 'none' }} placeholder="..." />
+              <input 
+                type={field.type || 'text'} 
+                required={field.required}
+                value={values[field.name || field.label]}
+                onChange={e => handleChange(field.name || field.label, e.target.value)}
+                style={{ width: '100%', padding: '16px 20px', borderRadius: '16px', border: '1px solid #eee', outline: 'none' }} 
+                placeholder="..." 
+              />
             )}
           </div>
         ))}
-        <button style={{ background: '#1a1a2e', color: '#fff', padding: '20px', borderRadius: '20px', fontWeight: 700, fontSize: '16px', marginTop: '24px' }}>Submit Application</button>
-      </div>
+        <button 
+          type="submit"
+          disabled={status === 'sending' || (isAnyLoginRequired && !isAuthorized)}
+          style={{ 
+            background: '#1a1a2e', 
+            color: '#fff', 
+            padding: '20px', 
+            borderRadius: '20px', 
+            fontWeight: 700, 
+            fontSize: '16px', 
+            marginTop: '24px',
+            border: 'none',
+            cursor: (status === 'sending' || (isAnyLoginRequired && !isAuthorized)) ? 'not-allowed' : 'pointer',
+            opacity: (status === 'sending' || (isAnyLoginRequired && !isAuthorized)) ? 0.5 : 1
+          }}
+        >
+          {status === 'sending' ? 'Submitting...' : 'Submit Application'}
+        </button>
+
+        {status === 'sent' && (
+          <div style={{ color: '#22c55e', fontSize: '14px', fontWeight: 600 }}>
+            Application sent successfully!
+          </div>
+        )}
+        {status === 'error' && (
+          <div style={{ color: '#ef4444', fontSize: '14px', fontWeight: 600 }}>
+            Failed to send application.
+          </div>
+        )}
+        {status === 'login_required' && (
+          <div style={{ color: '#eab308', fontSize: '14px', fontWeight: 600 }}>
+            Please login first.
+          </div>
+        )}
+      </form>
+
+      {user && (
+        <div style={{ marginTop: '60px', borderTop: '1px solid #eee', paddingTop: '40px' }}>
+          <h3 className="serif" style={{ fontSize: '24px', marginBottom: '24px' }}>Submission History</h3>
+          {fetchingResponses ? (
+            <p style={{ fontSize: '14px', color: '#6b7280', fontFamily: 'serif' }}>Loading previous submissions...</p>
+          ) : responses.length === 0 ? (
+            <p style={{ fontSize: '14px', color: '#6b7280', fontFamily: 'serif' }}>No previous submissions found.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: '24px' }}>
+              {responses.map((resp: any) => (
+                <div key={resp._id} style={{ border: '1px solid #eee', borderRadius: '24px', padding: '24px', background: '#fafafa' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {resp.submitterDetails?.avatar ? (
+                        <img src={resp.submitterDetails.avatar} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #ddd' }} />
+                      ) : (
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px', color: '#333' }}>
+                          {(resp.submitterDetails?.name || resp.submitterDetails?.gamertag || '?').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        {resp.submitterDetails?.loginType === 'zenuxs' ? (
+                          <>
+                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {resp.submitterDetails.name || 'Zenuxs User'}
+                              <span style={{ fontSize: '9px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 800 }}>Zenuxs</span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#6b7280' }}>{resp.submitterDetails.email}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {resp.submitterDetails?.gamertag || resp.submittedBy || 'Gamertag'}
+                              <span style={{ fontSize: '9px', background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 800 }}>Advanced Auth</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                      <span style={{ 
+                        fontSize: '11px', 
+                        fontWeight: 700, 
+                        textTransform: 'uppercase', 
+                        padding: '4px 10px', 
+                        borderRadius: '8px',
+                        background: resp.status === 'Accepted' || resp.status === 'accepted' ? '#ecfdf5' : resp.status === 'Rejected' || resp.status === 'rejected' ? '#fef2f2' : resp.status === 'Under Review' || resp.status === 'under review' ? '#fffbeb' : '#f3f4f6',
+                        color: resp.status === 'Accepted' || resp.status === 'accepted' ? '#059669' : resp.status === 'Rejected' || resp.status === 'rejected' ? '#dc2626' : resp.status === 'Under Review' || resp.status === 'under review' ? '#d97706' : '#6b7280',
+                        border: `1px solid ${resp.status === 'Accepted' || resp.status === 'accepted' ? '#a7f3d0' : resp.status === 'Rejected' || resp.status === 'rejected' ? '#fecaca' : resp.status === 'Under Review' || resp.status === 'under review' ? '#fde68a' : '#e5e7eb'}`
+                      }}>
+                        {resp.status || 'pending'}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#9ca3af' }}>{new Date(resp.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {Object.entries(resp.data || {}).map(([key, val]: any) => (
+                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: '#6b7280', fontWeight: 500 }}>{key}:</span>
+                        <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{String(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

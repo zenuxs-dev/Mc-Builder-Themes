@@ -46,7 +46,7 @@ export default async function PublicHome() {
     .filter((s: any) => s.visible)
     .sort((a: any, b: any) => a.order - b.order);
 
-  const extras = { products, announcements, forms, discussions, mcData: mcStatus };
+  const extras = { site, products, announcements, forms, discussions, mcData: mcStatus };
 
   return (
     <div style={{ minHeight: '100vh', background: theme.backgroundColor, color: theme.textColor, fontFamily: theme.font }}>

@@ -1,14 +1,24 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getSite } from '@/lib/api';
 
-interface AuthUser {
+export interface AuthUser {
   username: string;
   email?: string;
+  loginType: 'advanced_auth' | 'zenuxs';
+  token?: string;
+  id?: string;
+  _id?: string;
+  name?: string;
+  avatar?: string;
+  zenuxsId?: string;
+  minecraftUuid?: string;
+  plan?: string;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
-  login: (username: string, token: string) => void;
+  login: (username: string, token: string, loginType: 'advanced_auth' | 'zenuxs') => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -31,8 +41,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = (username: string, token: string) => {
-    const newUser = { username };
+  useEffect(() => {
+    if (isLoading) return;
+    getSite().then((site) => {
+      if (site?.requireLoginForWebsite && !user) {
+        const path = window.location.pathname;
+        if (path !== '/login') {
+          window.location.href = `/login?redirect=${encodeURIComponent(path)}`;
+        }
+      }
+    });
+  }, [user, isLoading]);
+
+  const login = (username: string, token: string, loginType: 'advanced_auth' | 'zenuxs') => {
+    const newUser: AuthUser = { username, loginType, token };
     setUser(newUser);
     localStorage.setItem('zenuxs_auth_user', JSON.stringify(newUser));
     localStorage.setItem('zenuxs_auth_token', token);

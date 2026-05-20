@@ -52,7 +52,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.valid) {
-        login(data.username, apiKey);
+        login(data.username, apiKey, 'advanced_auth');
         router.push('/');
       } else {
         setError('Invalid username or password.');
