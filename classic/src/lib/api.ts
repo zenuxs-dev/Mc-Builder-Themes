@@ -1,6 +1,6 @@
 import { cache } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mcbuilderapi.zenuxs.in/api';
 const API_BASE = API_URL.replace(/\/api\/?$/, '');
 const SITE_KEY = (process.env.NEXT_PUBLIC_SITE_KEY || '1031d301f914b747ff9fc6d4e011c210').trim();
 

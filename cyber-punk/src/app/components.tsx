@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { 
   Home, ShoppingCart, Activity, MessageSquare, Image, 
   Trophy, HelpCircle, Users, FileText, Layout, 
@@ -307,6 +308,9 @@ export function OnlinePlayers({ site, mcStatus, accent, content }: any) {
 }
 
 // ─── Store Section ──────────────────────────────
+// FIXED: replaced emoji string indexing with a static array
+const productIcons = ['💎', '⚔️', '🔥', '👑'];
+
 export function StorePreview({ site, products, accent, content, styles }: any) {
   const title = content?.title || "UPGRADES_MODULES";
   const linkText = content?.linkText || "VIEW_ALL_DATABASE →";
@@ -323,7 +327,7 @@ export function StorePreview({ site, products, accent, content, styles }: any) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '32px' }}>
         {products.slice(0, 4).map((p: any, i: number) => (
           <div key={p._id} className="cyber-border" style={{ padding: '32px', background: 'rgba(255,255,255,0.01)', transition: 'all 0.3s' }}>
-            <div style={{ fontSize: '40px', marginBottom: '24px' }}>{'💎⚔️🔥👑'[i % 4]}</div>
+            <div style={{ fontSize: '40px', marginBottom: '24px' }}>{productIcons[i % productIcons.length]}</div>
             <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#fff', marginBottom: '8px' }}>{p.name.toUpperCase()}</h3>
             <p style={{ fontSize: '14px', color: '#555', lineHeight: 1.6, marginBottom: '32px' }}>{p.description}</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
@@ -611,8 +615,10 @@ export function FeaturesSection({ site, accent, content, styles }: any) {
   );
 }
 
+// ─── FormRenderer (with fixed redirect URL) ───────────────────
 export function FormRenderer({ form, accent }: any) {
   const { user } = useAuth();
+  const pathname = usePathname(); // instead of window.location.pathname
   const [values, setValues] = useState<Record<string, any>>(() => {
     const init: Record<string, any> = {};
     (form.fields || []).forEach((f: any) => init[f.name || f.label || 'field'] = '');
@@ -714,7 +720,7 @@ export function FormRenderer({ form, accent }: any) {
                </>
              ) : (
                <>
-                 [ACCESS_RESTRICTED] PLEASE <Link href={`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} style={{ color: 'inherit', textDecoration: 'underline' }}>AUTHENTICATE</Link> VIA {isAdvRequired && isZenuxsRequired ? 'ADVANCED_AUTH OR ZENUXS' : isAdvRequired ? 'ADVANCED_AUTH' : 'ZENUXS'}
+                 [ACCESS_RESTRICTED] PLEASE <Link href={`/login?redirect=${encodeURIComponent(pathname)}`} style={{ color: 'inherit', textDecoration: 'underline' }}>AUTHENTICATE</Link> VIA {isAdvRequired && isZenuxsRequired ? 'ADVANCED_AUTH OR ZENUXS' : isAdvRequired ? 'ADVANCED_AUTH' : 'ZENUXS'}
                </>
              )}
            </div>
@@ -925,7 +931,7 @@ export function FormRenderer({ form, accent }: any) {
                        }}>
                          {resp.status || 'pending'}
                        </span>
-                       <span style={{ fontSize: '10px', color: '#444', fontFamily: 'monospace' }}>{new Date(resp.createdAt).toLocaleString()}</span>
+                       <span style={{ fontSize: '10px', color: '#444', fontFamily: 'monospace' }}>{new Date(resp.createdAt).toISOString()}</span>
                      </div>
                    </div>
 
